@@ -203,11 +203,71 @@ fn cmd_doctor(config: &ProjectConfig) {
         }
     }
 
+    // 8. runner binary freshness + PATH resolution
+    let mut checked_runners: Vec<String> = Vec::new();
+    for (plat_name, plat) in &config.platforms {
+        if checked_runners.contains(&plat.runner) { continue; }
+        checked_runners.push(plat.runner.clone());
+
+        let (_, which_out) = shell_check(&format!("which -a {} 2>/dev/null", plat.runner));
+        let paths: Vec<&str> = which_out.trim().lines().collect();
+        if paths.is_empty() {
+            println!("  FAIL  runner_path ({}) — not found in PATH", plat.runner);
+            failed += 1;
+            continue;
+        }
+        let primary = paths[0];
+        println!("  PASS  runner_path ({}) → {}", plat.runner, primary);
+        passed += 1;
+        if paths.len() > 1 {
+            println!("  WARN  runner_path ({}) — {} copies in PATH: {}", plat.runner, paths.len(), paths.join(", "));
+        }
+
+        if let Some(src) = &plat.source {
+            let bin_meta = fs::metadata(primary);
+            let src_path = Path::new(src);
+            let src_newest = find_newest_source(src_path);
+            if let (Ok(bin_m), Some(src_t)) = (bin_meta, src_newest) {
+                if let Ok(bin_t) = bin_m.modified() {
+                    let bin_dur = bin_t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                    if src_t > bin_dur {
+                        println!("  FAIL  runner_fresh ({}) — binary older than source", plat.runner);
+                        failed += 1;
+                    } else {
+                        println!("  PASS  runner_fresh ({}) — binary up to date", plat.runner);
+                        passed += 1;
+                    }
+                }
+            }
+        }
+    }
+
     println!();
     println!("{} passed, {} failed", passed, failed);
     if failed > 0 {
         process::exit(1);
     }
+}
+
+fn find_newest_source(dir: &Path) -> Option<std::time::Duration> {
+    let mut newest: Option<std::time::Duration> = None;
+    let Ok(entries) = fs::read_dir(dir) else { return None };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        if name.starts_with('.') || name == "target" || name == "build" || name == ".build" || name == "DerivedData" { continue; }
+        if path.is_dir() {
+            if let Some(t) = find_newest_source(&path) {
+                if newest.map_or(true, |n| t > n) { newest = Some(t); }
+            }
+        } else if let Ok(meta) = fs::metadata(&path) {
+            if let Ok(mod_time) = meta.modified() {
+                let dur = mod_time.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                if newest.map_or(true, |n| dur > n) { newest = Some(dur); }
+            }
+        }
+    }
+    newest
 }
 
 // ── tctl run ──
