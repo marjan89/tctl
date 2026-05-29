@@ -482,7 +482,7 @@ fn cmd_validate(args: &[String]) {
     let mut all_state_keys: Vec<String> = Vec::new();
     for fr in fr_list {
         let fr_id = fr.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        if let Some(states) = fr.get("state_table").and_then(|v| v.as_sequence()) {
+        if let Some(states) = fr.get("state_table").or_else(|| fr.get("states")).and_then(|v| v.as_sequence()) {
             for state in states {
                 let sid = state.get("id").and_then(|v| v.as_str()).unwrap_or("");
                 all_state_keys.push(format!("{}-{}", fr_id, sid));
@@ -510,7 +510,7 @@ fn cmd_validate(args: &[String]) {
         }
 
         // FR has ≥1 state
-        let states = fr.get("state_table").and_then(|v| v.as_sequence());
+        let states = fr.get("state_table").or_else(|| fr.get("states")).and_then(|v| v.as_sequence());
         match states {
             Some(list) if !list.is_empty() => {
                 passed += 1;
@@ -607,7 +607,7 @@ fn cmd_validate(args: &[String]) {
             failed += 1;
         }
         let actual_states: usize = fr_list.iter()
-            .map(|fr| fr.get("state_table").and_then(|v| v.as_sequence()).map(|s| s.len()).unwrap_or(0))
+            .map(|fr| fr.get("state_table").or_else(|| fr.get("states")).and_then(|v| v.as_sequence()).map(|s| s.len()).unwrap_or(0))
             .sum();
         if total_states as usize == actual_states {
             println!("  PASS  coverage_summary.total_states matches ({} == {})", total_states, actual_states);
