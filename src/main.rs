@@ -22,6 +22,7 @@ struct PlatformConfig {
     runner: String,
     agent_port: u16,
     source: Option<String>,
+    runner_prefix: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -387,10 +388,10 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
         if !fixtures_abs.is_empty() { env_prefix.push_str(&format!("{}={} ", fixtures_var, fixtures_abs)); }
         env_prefix.push_str(&format!("{}={} ", agent_port_var, plat.agent_port));
 
-        let nosandbox = if cfg!(target_os = "macos") { "nosandbox " } else { "" };
+        let prefix = plat.runner_prefix.as_deref().map(|p| format!("{} ", p)).unwrap_or_default();
         let cmd = format!(
             "{}{}{} {} -d {}{}{} {}",
-            nosandbox, env_prefix, plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
+            prefix, env_prefix, plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
         );
 
         eprintln!("exec: {}", cmd);
