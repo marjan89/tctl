@@ -488,11 +488,11 @@ fn cmd_validate(args: &[String]) {
         }
     };
 
-    // Collect all state keys for requires resolution
+    // Collect all state keys for requires resolution (pre-pass)
     let mut all_state_keys: Vec<String> = Vec::new();
-    for fr in fr_list {
-        let fr_id = fr.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        if let Some(states) = fr.get("state_table").or_else(|| fr.get("states")).and_then(|v| v.as_sequence()) {
+    for i in 0..fr_list.len() {
+        let fr_id = fr_list[i].get("id").and_then(|v| v.as_str()).unwrap_or("");
+        if let Some(states) = fr_list[i].get("state_table").or_else(|| fr_list[i].get("states")).and_then(|v| v.as_sequence()) {
             for state in states {
                 let sid = state.get("id").and_then(|v| v.as_str()).unwrap_or("");
                 all_state_keys.push(format!("{}-{}", fr_id, sid));
@@ -501,7 +501,9 @@ fn cmd_validate(args: &[String]) {
     }
 
     // 2. Per-FR validation
-    for fr in fr_list {
+    println!("  INFO  validating {} FRs...", fr_list.len());
+    for i in 0..fr_list.len() {
+        let fr = &fr_list[i];
         let fr_id = fr.get("id").and_then(|v| v.as_str()).unwrap_or("??");
         let fr_name = fr.get("name").and_then(|v| v.as_str()).unwrap_or("??");
 
@@ -546,6 +548,10 @@ fn cmd_validate(args: &[String]) {
 
             // State has assert_target
             let assert_target = state.get("assert_target").and_then(|v| v.as_str()).unwrap_or("");
+            if !assert_target.is_empty() && assert_target.contains('_') && !assert_target.contains(' ') {
+                println!("  WARN   {}: assert_target looks like code identifier: '{}' (should be visible UI text)", full_id, assert_target);
+                warnings += 1;
+            }
             if assert_target.is_empty() {
                 println!("  WARN  {}: no assert_target (generator will infer from renders)", full_id);
                 warnings += 1;
