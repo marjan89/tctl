@@ -425,19 +425,21 @@ fn collect_tc_files(suite_path: &str) -> Vec<PathBuf> {
 // ── tctl validate ──
 
 fn cmd_validate(args: &[String]) {
-    let spec_path = args.first().unwrap_or_else(|| {
+    let mut spec_path: Option<&str> = None;
+    let mut fixtures_path: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--fixtures" if i + 1 < args.len() => { fixtures_path = Some(args[i + 1].clone()); i += 2; }
+            "--project" if i + 1 < args.len() => { i += 2; } // skip, handled by main
+            s if !s.starts_with('-') && spec_path.is_none() => { spec_path = Some(s); i += 1; }
+            _ => { i += 1; }
+        }
+    }
+    let spec_path = spec_path.unwrap_or_else(|| {
         eprintln!("Usage: tctl validate <spec.yaml> [--fixtures <path>]");
         process::exit(1);
     });
-
-    let mut fixtures_path: Option<String> = None;
-    let mut i = 1;
-    while i < args.len() {
-        if args[i] == "--fixtures" && i + 1 < args.len() {
-            fixtures_path = Some(args[i + 1].clone());
-            i += 2;
-        } else { i += 1; }
-    }
 
     let content = fs::read_to_string(spec_path).unwrap_or_else(|e| {
         eprintln!("FAIL  read: {}: {}", spec_path, e);
@@ -655,6 +657,12 @@ fn main() {
     }
 
     let command = &command_name;
+
+    if command == "validate" {
+        cmd_validate(&args[remaining_args_start..]);
+        return;
+    }
+
     let config_path = project_path.unwrap_or_else(|| find_project_yaml());
     let config_dir = Path::new(&config_path).parent().unwrap_or(Path::new(".")).to_path_buf();
     let config = load_config(&config_path);
@@ -662,7 +670,6 @@ fn main() {
     match command.as_str() {
         "run" => cmd_run(&config, &config_dir, &args[remaining_args_start..]),
         "doctor" => cmd_doctor(&config, &config_dir),
-        "validate" => cmd_validate(&args[remaining_args_start..]),
         _ => {
             eprintln!("Unknown command: {}", command);
             process::exit(1);
