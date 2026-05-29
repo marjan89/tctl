@@ -1,0 +1,209 @@
+version: 1
+description: >
+  Contract between preflight (producer) and TC generator (consumer).
+  Preflight analyzes a ticket and emits this structure. The TC generator
+  reads it and produces runner-compatible TC YAML files.
+
+schema:
+  ticket:
+    type: object
+    required: [id, feature, sources]
+    fields:
+      id:
+        type: string
+        description: "Ticket identifier (e.g. OUT-2243)"
+      feature:
+        type: string
+        description: "Human-readable feature name"
+      sources:
+        type: array
+        items:
+          type: object
+          required: [name, contributed]
+          fields:
+            name:
+              type: string
+              description: "Source consulted (Linear, Figma, iOS codebase, etc.)"
+            contributed:
+              type: string
+              description: "What this source provided"
+            gaps:
+              type: string
+              description: "What was missing from this source"
+
+  functional_requirements:
+    type: array
+    items:
+      type: object
+      required: [id, name, type, applies_to, state_table]
+      fields:
+        id:
+          type: string
+          description: "FR identifier (e.g. FR1, FR2)"
+        name:
+          type: string
+          description: "Requirement name (e.g. 'Question Card — User Avatar & Name')"
+        type:
+          type: enum
+          values: [static, interactive]
+          description: >
+            static: verify element presence/absence after navigation.
+            interactive: requires user actions (tap, type, submit) to reach target state.
+        applies_to:
+          type: array
+          items:
+            type: string
+          description: "Components affected (e.g. ['QuestionListItem', 'QuestionCardItem'])"
+        navigation:
+          type: object
+          required: [target]
+          fields:
+            target:
+              type: enum
+              values: [site_detail, questions_list, profile_qa_tab, post_question, post_answer]
+              description: "Screen the TC must navigate to"
+            via:
+              type: array
+              items:
+                type: string
+              description: "Navigation steps to reach target (e.g. ['navigate_to_site', 'scroll_to Q&A', 'tap see all'])"
+        state_table:
+          type: array
+          items:
+            type: object
+            required: [id, state, condition, renders]
+            fields:
+              id:
+                type: string
+                description: "State identifier within the FR (e.g. S1, S2)"
+              state:
+                type: string
+                description: "Human-readable state name (e.g. 'User with avatar')"
+              condition:
+                type: string
+                description: "What makes this state active (e.g. 'user has portrait_image_url')"
+              renders:
+                type: string
+                description: "What the UI shows in this state"
+              requires:
+                type: string
+                description: >
+                  Prerequisite state that must be reached first. References
+                  another state by FR-State ID (e.g. 'FR8-S1'). Generator
+                  prepends the required state's interaction steps.
+              fixture:
+                type: string
+                description: "Fixture key needed (e.g. 'test_user', 'empty_site')"
+              assert_type:
+                type: enum
+                values: [element_exists, element_not_exists, element_count, text_matches]
+                description: "What kind of assertion this state produces"
+              assert_target:
+                type: string
+                description: "Fuzzy text or element id to assert against"
+              platform_fork:
+                type: object
+                fields:
+                  android:
+                    type: string
+                    description: "Android-specific action (e.g. 'long_press')"
+                  ios:
+                    type: string
+                    description: "iOS-specific action (e.g. 'tap remove')"
+        data_requirements:
+          type: string
+          description: "API fields or model changes needed for this FR"
+
+  fixtures:
+    type: object
+    description: >
+      Map of fixture keys to their required properties.
+      Preflight identifies which fixtures each FR needs and what
+      properties they must have.
+    fields:
+      required:
+        type: array
+        items:
+          type: object
+          required: [key, properties, used_by]
+          fields:
+            key:
+              type: string
+              description: "Fixture name (e.g. 'test_user', 'empty_site')"
+            properties:
+              type: array
+              items:
+                type: string
+              description: "Required properties (e.g. ['id', 'name', 'email'])"
+            used_by:
+              type: array
+              items:
+                type: string
+              description: "FRs that reference this fixture (e.g. ['FR1', 'FR5'])"
+      missing:
+        type: array
+        items:
+          type: object
+          required: [key, reason, needed_by]
+          fields:
+            key:
+              type: string
+              description: "Fixture that doesn't exist yet"
+            reason:
+              type: string
+              description: "Why it's needed"
+            needed_by:
+              type: array
+              items:
+                type: string
+              description: "FRs blocked without this fixture"
+
+  api_endpoints:
+    type: array
+    items:
+      type: object
+      required: [method, path, purpose]
+      fields:
+        method:
+          type: enum
+          values: [GET, POST, PUT, DELETE, PATCH]
+        path:
+          type: string
+          description: "Endpoint path (e.g. '/v3.2/users/{userId}/relationships/questions')"
+        purpose:
+          type: string
+          description: "What this endpoint does in the feature"
+        auth_required:
+          type: boolean
+        used_for:
+          type: enum
+          values: [seed, cleanup, verify, runtime]
+          description: >
+            seed: TC setup data. cleanup: TC teardown.
+            verify: assert backend state. runtime: app calls during feature use.
+
+  coverage_summary:
+    type: object
+    required: [total_frs, total_states, tc_count]
+    fields:
+      total_frs:
+        type: integer
+        description: "Number of functional requirements"
+      total_states:
+        type: integer
+        description: "Total states across all FR state tables"
+      tc_count:
+        type: integer
+        description: "Expected number of TCs (1 per state)"
+      blocked:
+        type: array
+        items:
+          type: object
+          required: [state_id, reason]
+          fields:
+            state_id:
+              type: string
+              description: "FR-State that can't be tested (e.g. 'FR5-S1')"
+            reason:
+              type: string
+              description: "Why it's blocked (e.g. 'needs 0-question test account')"
