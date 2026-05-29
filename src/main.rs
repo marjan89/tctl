@@ -279,9 +279,13 @@ fn cmd_run(config: &ProjectConfig, args: &[String]) {
         println!("\n── {} ({}) ──", dev.name, dev.platform);
         let start = Instant::now();
 
-        let catalogue_arg = config.catalogue.as_ref()
-            .map(|c| format!(" --catalogue {}", c))
-            .unwrap_or_default();
+        let catalogue_arg = if dev.platform == "ios" {
+            config.catalogue.as_ref()
+                .map(|c| format!(" --catalogue {}", c))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
         let baseline_arg = if capture_baseline { " --capture-baseline" } else { "" };
 
@@ -290,9 +294,11 @@ fn cmd_run(config: &ProjectConfig, args: &[String]) {
             .collect::<Vec<_>>()
             .join(" ");
 
+        let test_subcmd = if dev.platform == "ios" { "test run" } else { "test" };
+
         let cmd = format!(
-            "{} test run -d {}{}{} {}",
-            plat.runner, dev.name, catalogue_arg, baseline_arg, tc_list
+            "{} {} -d {}{}{} {}",
+            plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
         );
 
         eprintln!("exec: {}", cmd);
