@@ -34,9 +34,9 @@ devices:
   - name: dev-ios-two
     platform: ios
 
-catalogue: catalogue/features/
-fixtures: catalogue/fixtures.yaml
-suite: catalogue/features/q-and-a/tests/
+catalogue: /Users/Shared/projects/Outdoors/catalogue
+fixtures: /Users/Shared/projects/Outdoors/catalogue/fixtures.yaml
+suite: /Users/Shared/projects/Outdoors/catalogue/features/q-and-a/tests/
 
 doctor:
   checks:

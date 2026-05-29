@@ -1,0 +1,16 @@
+id: FR1-S1
+name: "Question Card — User Avatar & Name — User with avatar"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:52:53Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:52:53Z
+    action: navigate_to_user
+    result: FAIL
+    error: "navigate_to_user: agent endpoint failed — "
+    screen_element_count: 178
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:53:01Z

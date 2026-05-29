@@ -380,11 +380,17 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
         let email_var = if dev.platform == "ios" { "IDB_TEST_EMAIL" } else { "DDB_TEST_EMAIL" };
         let pass_var = if dev.platform == "ios" { "IDB_TEST_PASSWORD" } else { "DDB_TEST_PASSWORD" };
 
+        let fixtures_var = if dev.platform == "ios" { "IDB_FIXTURES_PATH" } else { "DDB_FIXTURES_PATH" };
+        let fixtures_abs = config.fixtures.as_ref()
+            .map(|f| resolve_relative(config_dir, f).to_string_lossy().to_string())
+            .unwrap_or_default();
+
         eprintln!("exec: {}", cmd);
         let mut runner_cmd = Command::new("sh");
         runner_cmd.arg("-c").arg(&cmd);
         if !email.is_empty() { runner_cmd.env(email_var, &email); }
         if !password.is_empty() { runner_cmd.env(pass_var, &password); }
+        if !fixtures_abs.is_empty() { runner_cmd.env(fixtures_var, &fixtures_abs); }
         let status = runner_cmd.status();
 
         let elapsed = start.elapsed();
