@@ -364,9 +364,10 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
 
         let test_subcmd = if dev.platform == "ios" { "test run" } else { "test" };
 
+        let nosandbox = if cfg!(target_os = "macos") { "nosandbox " } else { "" };
         let cmd = format!(
-            "{} {} -d {}{}{} {}",
-            plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
+            "{}{} {} -d {}{}{} {}",
+            nosandbox, plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
         );
 
         let email = config.credentials.as_ref()
