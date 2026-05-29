@@ -364,12 +364,6 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
 
         let test_subcmd = if dev.platform == "ios" { "test run" } else { "test" };
 
-        let nosandbox = if cfg!(target_os = "macos") { "nosandbox " } else { "" };
-        let cmd = format!(
-            "{}{} {} -d {}{}{} {}",
-            nosandbox, plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
-        );
-
         let email = config.credentials.as_ref()
             .and_then(|c| c.email.as_deref())
             .map(|e| resolve_env(e))
@@ -380,19 +374,27 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
             .unwrap_or_default();
         let email_var = if dev.platform == "ios" { "IDB_TEST_EMAIL" } else { "DDB_TEST_EMAIL" };
         let pass_var = if dev.platform == "ios" { "IDB_TEST_PASSWORD" } else { "DDB_TEST_PASSWORD" };
-
         let fixtures_var = if dev.platform == "ios" { "IDB_FIXTURES_PATH" } else { "DDB_FIXTURES_PATH" };
         let fixtures_abs = config.fixtures.as_ref()
             .map(|f| resolve_relative(config_dir, f).to_string_lossy().to_string())
             .unwrap_or_default();
+        let agent_port_var = if dev.platform == "ios" { "IDB_AGENT_PORT" } else { "DDB_AGENT_PORT" };
+
+        // Inline env vars in command string (nosandbox uses tmux run-shell, doesn't inherit env)
+        let mut env_prefix = String::new();
+        if !email.is_empty() { env_prefix.push_str(&format!("{}={} ", email_var, email)); }
+        if !password.is_empty() { env_prefix.push_str(&format!("{}={} ", pass_var, password)); }
+        if !fixtures_abs.is_empty() { env_prefix.push_str(&format!("{}={} ", fixtures_var, fixtures_abs)); }
+        env_prefix.push_str(&format!("{}={} ", agent_port_var, plat.agent_port));
+
+        let nosandbox = if cfg!(target_os = "macos") { "nosandbox " } else { "" };
+        let cmd = format!(
+            "{}{}{} {} -d {}{}{} {}",
+            nosandbox, env_prefix, plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
+        );
 
         eprintln!("exec: {}", cmd);
-        let mut runner_cmd = Command::new("sh");
-        runner_cmd.arg("-c").arg(&cmd);
-        if !email.is_empty() { runner_cmd.env(email_var, &email); }
-        if !password.is_empty() { runner_cmd.env(pass_var, &password); }
-        if !fixtures_abs.is_empty() { runner_cmd.env(fixtures_var, &fixtures_abs); }
-        let status = runner_cmd.status();
+        let status = Command::new("sh").arg("-c").arg(&cmd).status();
 
         let elapsed = start.elapsed();
         match status {
