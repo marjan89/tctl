@@ -144,12 +144,13 @@ fn cmd_doctor(config: &ProjectConfig) {
         }
 
         // 4. idle_resources
+        let idle_endpoint = if dev.platform == "ios" { "idle" } else { "idle-resources" };
         let cmd = format!(
-            "curl -s --connect-timeout 2 --max-time 5 http://{}:{}/idle-resources",
-            host, plat.agent_port
+            "curl -s --connect-timeout 2 --max-time 5 http://{}:{}/{}",
+            host, plat.agent_port, idle_endpoint
         );
         let (code, out) = shell_check(&cmd);
-        if code == 0 && (out.contains("navigation") || out.contains("ui_thread")) {
+        if code == 0 && (out.contains("navigation") || out.contains("ui_thread") || out.contains("idle")) {
             println!("  PASS  idle_resources");
             passed += 1;
         } else {
