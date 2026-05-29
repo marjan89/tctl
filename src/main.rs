@@ -460,7 +460,7 @@ fn cmd_validate(args: &[String]) {
         println!("  PASS  ticket.id present");
         passed += 1;
     } else {
-        println!("  FAIL  ticket.id missing");
+        println!("  ERROR  ticket.id missing");
         failed += 1;
     }
 
@@ -472,7 +472,7 @@ fn cmd_validate(args: &[String]) {
             list
         }
         _ => {
-            println!("  FAIL  functional_requirements missing or empty");
+            println!("  ERROR  functional_requirements missing or empty");
             failed += 1;
             process::exit(1);
         }
@@ -497,7 +497,7 @@ fn cmd_validate(args: &[String]) {
 
         // FR has id + name
         if fr_id == "??" || fr_name == "??" {
-            println!("  FAIL  FR missing id or name");
+            println!("  ERROR  FR missing id or name");
             failed += 1;
             continue;
         }
@@ -505,7 +505,7 @@ fn cmd_validate(args: &[String]) {
         // FR has type
         let fr_type = fr.get("type").and_then(|v| v.as_str()).unwrap_or("");
         if fr_type != "static" && fr_type != "interactive" {
-            println!("  FAIL  {}: type must be 'static' or 'interactive', got '{}'", fr_id, fr_type);
+            println!("  ERROR  {}: type must be 'static' or 'interactive', got '{}'", fr_id, fr_type);
             failed += 1;
         }
 
@@ -516,7 +516,7 @@ fn cmd_validate(args: &[String]) {
                 passed += 1;
             }
             _ => {
-                println!("  FAIL  {}: no states in state_table", fr_id);
+                println!("  ERROR  {}: no states in state_table", fr_id);
                 failed += 1;
                 continue;
             }
@@ -530,7 +530,7 @@ fn cmd_validate(args: &[String]) {
             // State has renders
             let renders = state.get("renders").and_then(|v| v.as_str()).unwrap_or("");
             if renders.is_empty() {
-                println!("  FAIL  {}: renders is empty", full_id);
+                println!("  ERROR  {}: renders is empty", full_id);
                 failed += 1;
             }
 
@@ -545,7 +545,7 @@ fn cmd_validate(args: &[String]) {
             let condition = state.get("condition").and_then(|v| v.as_str()).unwrap_or("");
             for field_val in [renders, assert_target, condition] {
                 if field_val.to_uppercase().contains("MISSING") || field_val.contains("TODO") || field_val.contains("TBD") {
-                    println!("  FAIL  {}: placeholder value detected: '{}'", full_id, &field_val[..field_val.len().min(50)]);
+                    println!("  ERROR  {}: placeholder value detected: '{}'", full_id, &field_val[..field_val.len().min(50)]);
                     failed += 1;
                 }
             }
@@ -556,7 +556,7 @@ fn cmd_validate(args: &[String]) {
                     for r in req.split(',') {
                         let r = r.trim();
                         if !r.is_empty() && !all_state_keys.contains(&r.to_string()) {
-                            println!("  FAIL  {}: requires '{}' does not resolve to any state", full_id, r);
+                            println!("  ERROR  {}: requires '{}' does not resolve to any state", full_id, r);
                             failed += 1;
                         }
                     }
@@ -566,7 +566,7 @@ fn cmd_validate(args: &[String]) {
             // Fixture ref check
             if let Some(fixture) = state.get("fixture").and_then(|v| v.as_str()) {
                 if fixture.to_uppercase() == "MISSING" || fixture.contains("TODO") {
-                    println!("  FAIL  {}: fixture is placeholder: '{}'", full_id, fixture);
+                    println!("  ERROR  {}: fixture is placeholder: '{}'", full_id, fixture);
                     failed += 1;
                 }
             }
@@ -603,7 +603,7 @@ fn cmd_validate(args: &[String]) {
             println!("  PASS  coverage_summary.total_frs matches ({} == {})", total_frs, fr_list.len());
             passed += 1;
         } else {
-            println!("  FAIL  coverage_summary.total_frs mismatch ({} != {})", total_frs, fr_list.len());
+            println!("  ERROR  coverage_summary.total_frs mismatch ({} != {})", total_frs, fr_list.len());
             failed += 1;
         }
         let actual_states: usize = fr_list.iter()
@@ -613,12 +613,12 @@ fn cmd_validate(args: &[String]) {
             println!("  PASS  coverage_summary.total_states matches ({} == {})", total_states, actual_states);
             passed += 1;
         } else {
-            println!("  FAIL  coverage_summary.total_states mismatch ({} != {})", total_states, actual_states);
+            println!("  ERROR  coverage_summary.total_states mismatch ({} != {})", total_states, actual_states);
             failed += 1;
         }
     }
 
-    println!("\n{} passed, {} failed, {} warnings", passed, failed, warnings);
+    println!("\n{} passed, {} errors, {} warnings", passed, failed, warnings);
     if failed > 0 {
         process::exit(1);
     }
