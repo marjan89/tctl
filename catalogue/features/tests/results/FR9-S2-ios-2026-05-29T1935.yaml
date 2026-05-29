@@ -1,0 +1,76 @@
+id: FR9-S2
+name: "Post Answer Flow (interactive) — form-submitted"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:35:22Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:35:22Z
+    action: navigate_to_site
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:35:26Z
+    action: wait_idle
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:35:26Z
+    action: scroll_to
+    target: {content_fuzzy: "see all questions"}
+    result: PASS
+
+  - step: 4
+    timestamp: 2026-05-29T19:35:27Z
+    action: tap
+    target: {content_fuzzy: "see all questions"}
+    result: PASS
+
+  - step: 5
+    timestamp: 2026-05-29T19:35:29Z
+    action: wait_idle
+    result: PASS
+
+  - step: 6
+    timestamp: 2026-05-29T19:35:29Z
+    action: tap
+    target: {content_fuzzy: "answer"}
+    result: PASS
+
+  - step: 7
+    timestamp: 2026-05-29T19:35:31Z
+    action: wait_idle
+    result: PASS
+
+  - step: 8
+    timestamp: 2026-05-29T19:35:31Z
+    action: type
+    result: PASS
+
+  - step: 9
+    timestamp: 2026-05-29T19:35:36Z
+    action: wait
+    result: PASS
+
+  - step: 10
+    timestamp: 2026-05-29T19:35:37Z
+    action: tap
+    target: {content_fuzzy: "post"}
+    result: PASS
+
+  - step: 11
+    timestamp: 2026-05-29T19:35:38Z
+    action: wait
+    result: PASS
+
+  - step: 12
+    timestamp: 2026-05-29T19:35:43Z
+    assert: element_exists
+    target: {content_fuzzy: "thank"}
+    result: FAIL
+    error: "element not found: thank"
+    screen_element_count: 45
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:35:48Z

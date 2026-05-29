@@ -1,0 +1,33 @@
+id: TC-18a
+name: "Action area hidden on Oscar's profile"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:37:13Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:37:13Z
+    action: navigate_to_user
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:37:17Z
+    action: tap
+    target: {content_fuzzy: "questions"}
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:37:19Z
+    action: wait
+    result: PASS
+
+  - step: 4
+    timestamp: 2026-05-29T19:37:19Z
+    assert: element_not_exists
+    target: {content_fuzzy: "latest places you want to go"}
+    result: FAIL
+    error: "element should not exist but found: latest places you want to go"
+    screen_element_count: 85
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:37:21Z

@@ -1,0 +1,50 @@
+id: TC-12
+name: "Question card tap navigates to linked site"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:38:29Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:38:29Z
+    action: navigate_to_site
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:38:34Z
+    action: scroll_to
+    target: {content_fuzzy: "see all questions"}
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:38:35Z
+    action: tap
+    target: {content_fuzzy: "see all questions"}
+    result: PASS
+
+  - step: 4
+    timestamp: 2026-05-29T19:38:38Z
+    action: wait
+    result: PASS
+
+  - step: 5
+    timestamp: 2026-05-29T19:38:38Z
+    action: tap
+    target: {content_fuzzy: "question"}
+    result: PASS
+
+  - step: 6
+    timestamp: 2026-05-29T19:38:41Z
+    action: wait
+    result: PASS
+
+  - step: 7
+    timestamp: 2026-05-29T19:38:44Z
+    assert: element_exists
+    target: {content_fuzzy: "{{fixtures.test_site.name}}"}
+    result: FAIL
+    error: "element not found: {{fixtures.test_site.name}}"
+    screen_element_count: 137
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:38:53Z

@@ -1,0 +1,16 @@
+id: {{created_question.data.id}}
+name: "Seed Q&A test data via API"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:36:39Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:36:39Z
+    action: api_call
+    result: FAIL
+    error: "api_call: no url"
+    screen_element_count: 137
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:36:43Z

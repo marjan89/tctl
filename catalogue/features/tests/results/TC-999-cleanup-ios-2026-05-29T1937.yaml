@@ -1,0 +1,16 @@
+id: TC-999-cleanup
+name: "Clean up seeded Q&A test data"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:36:56Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:36:56Z
+    action: api_call
+    result: FAIL
+    error: "api_call: no url"
+    screen_element_count: 137
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:37:00Z

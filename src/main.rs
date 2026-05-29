@@ -422,6 +422,206 @@ fn collect_tc_files(suite_path: &str) -> Vec<PathBuf> {
     files
 }
 
+// ── tctl validate ──
+
+fn cmd_validate(args: &[String]) {
+    let spec_path = args.first().unwrap_or_else(|| {
+        eprintln!("Usage: tctl validate <spec.yaml> [--fixtures <path>]");
+        process::exit(1);
+    });
+
+    let mut fixtures_path: Option<String> = None;
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "--fixtures" && i + 1 < args.len() {
+            fixtures_path = Some(args[i + 1].clone());
+            i += 2;
+        } else { i += 1; }
+    }
+
+    let content = fs::read_to_string(spec_path).unwrap_or_else(|e| {
+        eprintln!("FAIL  read: {}: {}", spec_path, e);
+        process::exit(2);
+    });
+    let spec: serde_yaml::Value = serde_yaml::from_str(&content).unwrap_or_else(|e| {
+        eprintln!("FAIL  parse: {}: {}", spec_path, e);
+        process::exit(2);
+    });
+
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut warnings = 0;
+
+    // 1. Top-level structure
+    let ticket = spec.get("ticket");
+    if ticket.is_some() && ticket.unwrap().get("id").is_some() {
+        println!("  PASS  ticket.id present");
+        passed += 1;
+    } else {
+        println!("  FAIL  ticket.id missing");
+        failed += 1;
+    }
+
+    let frs = spec.get("functional_requirements").and_then(|v| v.as_sequence());
+    let fr_list = match frs {
+        Some(list) if !list.is_empty() => {
+            println!("  PASS  functional_requirements: {} FRs", list.len());
+            passed += 1;
+            list
+        }
+        _ => {
+            println!("  FAIL  functional_requirements missing or empty");
+            failed += 1;
+            process::exit(1);
+        }
+    };
+
+    // Collect all state keys for requires resolution
+    let mut all_state_keys: Vec<String> = Vec::new();
+    for fr in fr_list {
+        let fr_id = fr.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        if let Some(states) = fr.get("state_table").and_then(|v| v.as_sequence()) {
+            for state in states {
+                let sid = state.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                all_state_keys.push(format!("{}-{}", fr_id, sid));
+            }
+        }
+    }
+
+    // 2. Per-FR validation
+    for fr in fr_list {
+        let fr_id = fr.get("id").and_then(|v| v.as_str()).unwrap_or("??");
+        let fr_name = fr.get("name").and_then(|v| v.as_str()).unwrap_or("??");
+
+        // FR has id + name
+        if fr_id == "??" || fr_name == "??" {
+            println!("  FAIL  FR missing id or name");
+            failed += 1;
+            continue;
+        }
+
+        // FR has type
+        let fr_type = fr.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        if fr_type != "static" && fr_type != "interactive" {
+            println!("  FAIL  {}: type must be 'static' or 'interactive', got '{}'", fr_id, fr_type);
+            failed += 1;
+        }
+
+        // FR has ≥1 state
+        let states = fr.get("state_table").and_then(|v| v.as_sequence());
+        match states {
+            Some(list) if !list.is_empty() => {
+                passed += 1;
+            }
+            _ => {
+                println!("  FAIL  {}: no states in state_table", fr_id);
+                failed += 1;
+                continue;
+            }
+        }
+        let states = states.unwrap();
+
+        for state in states {
+            let sid = state.get("id").and_then(|v| v.as_str()).unwrap_or("??");
+            let full_id = format!("{}-{}", fr_id, sid);
+
+            // State has renders
+            let renders = state.get("renders").and_then(|v| v.as_str()).unwrap_or("");
+            if renders.is_empty() {
+                println!("  FAIL  {}: renders is empty", full_id);
+                failed += 1;
+            }
+
+            // State has assert_target
+            let assert_target = state.get("assert_target").and_then(|v| v.as_str()).unwrap_or("");
+            if assert_target.is_empty() {
+                println!("  WARN  {}: no assert_target (generator will infer from renders)", full_id);
+                warnings += 1;
+            }
+
+            // No MISSING/placeholder values
+            let condition = state.get("condition").and_then(|v| v.as_str()).unwrap_or("");
+            for field_val in [renders, assert_target, condition] {
+                if field_val.to_uppercase().contains("MISSING") || field_val.contains("TODO") || field_val.contains("TBD") {
+                    println!("  FAIL  {}: placeholder value detected: '{}'", full_id, &field_val[..field_val.len().min(50)]);
+                    failed += 1;
+                }
+            }
+
+            // Requires references resolve
+            if let Some(req) = state.get("requires").and_then(|v| v.as_str()) {
+                if !req.is_empty() {
+                    for r in req.split(',') {
+                        let r = r.trim();
+                        if !r.is_empty() && !all_state_keys.contains(&r.to_string()) {
+                            println!("  FAIL  {}: requires '{}' does not resolve to any state", full_id, r);
+                            failed += 1;
+                        }
+                    }
+                }
+            }
+
+            // Fixture ref check
+            if let Some(fixture) = state.get("fixture").and_then(|v| v.as_str()) {
+                if fixture.to_uppercase() == "MISSING" || fixture.contains("TODO") {
+                    println!("  FAIL  {}: fixture is placeholder: '{}'", full_id, fixture);
+                    failed += 1;
+                }
+            }
+        }
+    }
+
+    // 3. Fixtures section
+    if let Some(fixtures) = spec.get("fixtures") {
+        if let Some(required) = fixtures.get("required").and_then(|v| v.as_sequence()) {
+            println!("  PASS  fixtures.required: {} entries", required.len());
+            passed += 1;
+
+            // Check fixture keys against fixtures.yaml if provided
+            if let Some(ref fp) = fixtures_path {
+                if Path::new(fp).exists() {
+                    let fix_content = fs::read_to_string(fp).unwrap_or_default();
+                    for entry in required {
+                        let key = entry.get("key").and_then(|v| v.as_str()).unwrap_or("");
+                        if !key.is_empty() && !fix_content.contains(key) {
+                            println!("  WARN  fixture '{}' not found in {}", key, fp);
+                            warnings += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Coverage summary
+    if let Some(coverage) = spec.get("coverage_summary") {
+        let total_frs = coverage.get("total_frs").and_then(|v| v.as_u64()).unwrap_or(0);
+        let total_states = coverage.get("total_states").and_then(|v| v.as_u64()).unwrap_or(0);
+        if total_frs as usize == fr_list.len() {
+            println!("  PASS  coverage_summary.total_frs matches ({} == {})", total_frs, fr_list.len());
+            passed += 1;
+        } else {
+            println!("  FAIL  coverage_summary.total_frs mismatch ({} != {})", total_frs, fr_list.len());
+            failed += 1;
+        }
+        let actual_states: usize = fr_list.iter()
+            .map(|fr| fr.get("state_table").and_then(|v| v.as_sequence()).map(|s| s.len()).unwrap_or(0))
+            .sum();
+        if total_states as usize == actual_states {
+            println!("  PASS  coverage_summary.total_states matches ({} == {})", total_states, actual_states);
+            passed += 1;
+        } else {
+            println!("  FAIL  coverage_summary.total_states mismatch ({} != {})", total_states, actual_states);
+            failed += 1;
+        }
+    }
+
+    println!("\n{} passed, {} failed, {} warnings", passed, failed, warnings);
+    if failed > 0 {
+        process::exit(1);
+    }
+}
+
 // ── main ──
 
 fn main() {
@@ -462,6 +662,7 @@ fn main() {
     match command.as_str() {
         "run" => cmd_run(&config, &config_dir, &args[remaining_args_start..]),
         "doctor" => cmd_doctor(&config, &config_dir),
+        "validate" => cmd_validate(&args[remaining_args_start..]),
         _ => {
             eprintln!("Unknown command: {}", command);
             process::exit(1);

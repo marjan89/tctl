@@ -1,0 +1,41 @@
+id: FR9-S1
+name: "Post Answer Flow (interactive) — form-open"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:35:02Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:35:02Z
+    action: navigate_to_site
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:35:06Z
+    action: wait_idle
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:35:07Z
+    action: scroll_to
+    target: {content_fuzzy: "questions & answers"}
+    result: PASS
+
+  - step: 4
+    timestamp: 2026-05-29T19:35:08Z
+    action: tap
+    target: {content_fuzzy: "answer"}
+    result: PASS
+
+  - step: 5
+    timestamp: 2026-05-29T19:35:10Z
+    action: wait
+    result: PASS
+
+  - step: 6
+    timestamp: 2026-05-29T19:35:10Z
+    assert: element_exists
+    target: {content_fuzzy: "answer"}
+    result: PASS
+
+result: PASS
+finished: 2026-05-29T19:35:10Z

@@ -1,0 +1,35 @@
+id: TC-11
+name: "Empty state — other user with no questions (Thomas Ivung)"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:40:16Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:40:16Z
+    action: navigate_to_user
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:40:21Z
+    action: wait_idle
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:40:21Z
+    action: tap
+    target: {content_fuzzy: "questions"}
+    result: PASS
+
+  - step: 4
+    timestamp: 2026-05-29T19:40:24Z
+    action: wait
+    result: PASS
+
+  - step: 5
+    timestamp: 2026-05-29T19:40:27Z
+    assert: element_exists
+    target: {content_fuzzy: "asked a question yet"}
+    result: PASS
+
+result: PASS
+finished: 2026-05-29T19:40:32Z

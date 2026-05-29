@@ -1,0 +1,17 @@
+id: TC-46
+name: "Dashboard Q&A preview consistency"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:39:06Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:39:06Z
+    action: tap
+    target: {content_fuzzy: "discover"}
+    result: FAIL
+    error: "tap: element not found (id=, text=)"
+    screen_element_count: 123
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:39:27Z
