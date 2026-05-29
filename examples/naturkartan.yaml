@@ -1,0 +1,58 @@
+project: naturkartan
+
+platforms:
+  android:
+    package: se.naturkartan.android
+    runner: ddb
+    agent_port: 19876
+    source: /Users/Shared/projects/Outdoors/nk-android-2026
+  ios:
+    package: se.outdoormap.naturkartan
+    runner: idb
+    agent_port: 9877
+    source: /Users/Shared/projects/Outdoors/nk-ios-2026
+
+api:
+  base_url: "https://apiv3.naturkartan.se"
+  search_url: "https://ts.naturkartan.se"
+
+ticket_tracker:
+  type: linear
+  project: OUT
+
+credentials:
+  email: ${IDB_TEST_EMAIL}
+  password: ${IDB_TEST_PASSWORD}
+
+devices:
+  - name: a54
+    platform: android
+  - name: mi-a2
+    platform: android
+  - name: dev-ios-one
+    platform: ios
+  - name: dev-ios-two
+    platform: ios
+
+catalogue: catalogue/features/
+fixtures: catalogue/fixtures.yaml
+suite: catalogue/features/q-and-a/tests/
+
+doctor:
+  checks:
+    - name: device_connected
+      description: "Device is connected and visible to runner"
+    - name: wda_ready
+      description: "WDA is running (iOS only)"
+    - name: agent_health
+      description: "Semantic agent responds to /health"
+    - name: idle_resources
+      description: "Agent reports idle resources via /idle-resources"
+    - name: app_installed
+      description: "Target app is installed on device"
+    - name: credentials
+      description: "Test credentials env vars are set"
+    - name: fixtures
+      description: "fixtures.yaml exists and is parseable"
+    - name: runner_version
+      description: "Runner binary hash matches expected"
