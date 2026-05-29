@@ -1,0 +1,38 @@
+id: FR5-S1
+name: "Empty State — Profile Q&A Tab — own-empty"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:29:44Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:29:44Z
+    action: navigate_to_user
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:29:48Z
+    action: wait_idle
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:29:49Z
+    action: tap
+    target: {content_fuzzy: "questions"}
+    result: PASS
+
+  - step: 4
+    timestamp: 2026-05-29T19:29:50Z
+    action: wait
+    result: PASS
+
+  - step: 5
+    timestamp: 2026-05-29T19:29:50Z
+    assert: element_exists
+    target: {content_fuzzy: "You haven't answered or asked a question yet"}
+    result: FAIL
+    error: "element not found: You haven't answered or asked a question yet"
+    screen_element_count: 87
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:29:56Z

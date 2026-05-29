@@ -1,0 +1,24 @@
+id: FR7-S4
+name: "Full Questions List Screen for Site — tap-post"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:32:35Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:32:35Z
+    action: navigate_to_site
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:32:39Z
+    action: wait_idle
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:32:39Z
+    action: scroll_to
+    target: {content_fuzzy: "questions & answers"}
+    result: PASS
+
+result: PASS
+finished: 2026-05-29T19:32:40Z

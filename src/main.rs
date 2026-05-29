@@ -89,7 +89,12 @@ fn shell_check(cmd: &str) -> (i32, String) {
 
 // ── tctl doctor ──
 
-fn cmd_doctor(config: &ProjectConfig) {
+fn resolve_relative(base_dir: &Path, p: &str) -> PathBuf {
+    let path = Path::new(p);
+    if path.is_absolute() { path.to_path_buf() } else { base_dir.join(p) }
+}
+
+fn cmd_doctor(config: &ProjectConfig, config_dir: &Path) {
     let mut passed = 0;
     let mut failed = 0;
 
@@ -195,11 +200,12 @@ fn cmd_doctor(config: &ProjectConfig) {
 
     // 7. fixtures
     if let Some(fix_path) = &config.fixtures {
-        if Path::new(fix_path).exists() {
-            println!("  PASS  fixtures ({})", fix_path);
+        let resolved = resolve_relative(config_dir, fix_path);
+        if resolved.exists() {
+            println!("  PASS  fixtures ({})", resolved.display());
             passed += 1;
         } else {
-            println!("  FAIL  fixtures — {} not found", fix_path);
+            println!("  FAIL  fixtures — {} not found", resolved.display());
             failed += 1;
         }
     }
@@ -273,7 +279,7 @@ fn find_newest_source(dir: &Path) -> Option<std::time::Duration> {
 
 // ── tctl run ──
 
-fn cmd_run(config: &ProjectConfig, args: &[String]) {
+fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
     let mut device_filter: Option<&str> = None;
     let mut platform_filter: Option<&str> = None;
     let mut suite_override: Option<&str> = None;
@@ -300,13 +306,14 @@ fn cmd_run(config: &ProjectConfig, args: &[String]) {
         i += 1;
     }
 
-    let suite = suite_override
+    let suite_raw = suite_override
         .map(|s| s.to_string())
         .or_else(|| config.suite.clone())
         .unwrap_or_else(|| {
             eprintln!("No suite path. Use --suite <path> or set 'suite' in project.yaml");
             process::exit(1);
         });
+    let suite = resolve_relative(config_dir, &suite_raw).to_string_lossy().to_string();
 
     let tc_files = collect_tc_files(&suite);
     if tc_files.is_empty() {
@@ -362,11 +369,23 @@ fn cmd_run(config: &ProjectConfig, args: &[String]) {
             plat.runner, test_subcmd, dev.name, catalogue_arg, baseline_arg, tc_list
         );
 
+        let email = config.credentials.as_ref()
+            .and_then(|c| c.email.as_deref())
+            .map(|e| resolve_env(e))
+            .unwrap_or_default();
+        let password = config.credentials.as_ref()
+            .and_then(|c| c.password.as_deref())
+            .map(|p| resolve_env(p))
+            .unwrap_or_default();
+        let email_var = if dev.platform == "ios" { "IDB_TEST_EMAIL" } else { "DDB_TEST_EMAIL" };
+        let pass_var = if dev.platform == "ios" { "IDB_TEST_PASSWORD" } else { "DDB_TEST_PASSWORD" };
+
         eprintln!("exec: {}", cmd);
-        let status = Command::new("sh")
-            .arg("-c")
-            .arg(&cmd)
-            .status();
+        let mut runner_cmd = Command::new("sh");
+        runner_cmd.arg("-c").arg(&cmd);
+        if !email.is_empty() { runner_cmd.env(email_var, &email); }
+        if !password.is_empty() { runner_cmd.env(pass_var, &password); }
+        let status = runner_cmd.status();
 
         let elapsed = start.elapsed();
         match status {
@@ -437,11 +456,12 @@ fn main() {
 
     let command = &command_name;
     let config_path = project_path.unwrap_or_else(|| find_project_yaml());
+    let config_dir = Path::new(&config_path).parent().unwrap_or(Path::new(".")).to_path_buf();
     let config = load_config(&config_path);
 
     match command.as_str() {
-        "run" => cmd_run(&config, &args[remaining_args_start..]),
-        "doctor" => cmd_doctor(&config),
+        "run" => cmd_run(&config, &config_dir, &args[remaining_args_start..]),
+        "doctor" => cmd_doctor(&config, &config_dir),
         _ => {
             eprintln!("Unknown command: {}", command);
             process::exit(1);

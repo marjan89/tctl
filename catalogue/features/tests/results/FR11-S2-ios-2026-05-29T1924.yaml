@@ -1,0 +1,18 @@
+id: FR11-S2
+name: "Navigate to User Profile — from-site-detail"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:24:55Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:24:55Z
+    action: navigate_to_user
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:24:59Z
+    action: wait_idle
+    result: PASS
+
+result: PASS
+finished: 2026-05-29T19:24:59Z

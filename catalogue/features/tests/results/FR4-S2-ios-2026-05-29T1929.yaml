@@ -1,0 +1,18 @@
+id: FR4-S2
+name: "Site Icon in Header Bar — no-icon"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:29:27Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:29:27Z
+    action: navigate_to_site
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:29:32Z
+    action: wait_idle
+    result: PASS
+
+result: PASS
+finished: 2026-05-29T19:29:32Z

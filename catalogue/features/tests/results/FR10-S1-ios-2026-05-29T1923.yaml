@@ -1,0 +1,44 @@
+id: FR10-S1
+name: "Delete Question (interactive) — dialog-shown"
+platform: ios
+device: dev-ios-one
+started: 2026-05-29T19:23:09Z
+steps:
+  - step: 1
+    timestamp: 2026-05-29T19:23:09Z
+    action: navigate_to_site
+    result: PASS
+
+  - step: 2
+    timestamp: 2026-05-29T19:23:13Z
+    action: wait_idle
+    result: PASS
+
+  - step: 3
+    timestamp: 2026-05-29T19:23:13Z
+    action: scroll_to
+    target: {content_fuzzy: "see all questions"}
+    result: PASS
+
+  - step: 4
+    timestamp: 2026-05-29T19:23:14Z
+    action: tap
+    target: {content_fuzzy: "see all questions"}
+    result: PASS
+
+  - step: 5
+    timestamp: 2026-05-29T19:23:16Z
+    action: wait
+    result: PASS
+
+  - step: 6
+    timestamp: 2026-05-29T19:23:18Z
+    action: scroll_to
+    target: {content_fuzzy: "{{fixtures.test_question.text}}"}
+    result: FAIL
+    error: "scroll_to: element not found: {{fixtures.test_question.text}}"
+    screen_element_count: 123
+    visible_labels: []
+
+result: FAIL
+finished: 2026-05-29T19:23:34Z
