@@ -10,6 +10,7 @@ platforms:
     package: se.outdoormap.naturkartan
     runner: idb
     agent_port: 9877
+    home_tab: Discover
     source: /Users/Shared/projects/Outdoors/nk-ios-2026
 
 api:

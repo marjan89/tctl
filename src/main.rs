@@ -32,6 +32,7 @@ struct PlatformConfig {
     agent_port: u16,
     source: Option<String>,
     runner_prefix: Option<String>,
+    home_tab: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -416,6 +417,10 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
         if !password.is_empty() { env_prefix.push_str(&format!("{}={} ", pass_var, password)); }
         if !fixtures_abs.is_empty() { env_prefix.push_str(&format!("{}={} ", fixtures_var, fixtures_abs)); }
         env_prefix.push_str(&format!("{}={} ", agent_port_var, plat.agent_port));
+        if let Some(ref tab) = plat.home_tab {
+            let tab_var = if dev.platform == "ios" { "IDB_HOME_TAB" } else { "DDB_HOME_TAB" };
+            env_prefix.push_str(&format!("{}={} ", tab_var, tab));
+        }
 
         let prefix = plat.runner_prefix.as_deref().map(|p| format!("{} ", p)).unwrap_or_default();
         let cmd = format!(
