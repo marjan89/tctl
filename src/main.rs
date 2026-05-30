@@ -1,3 +1,5 @@
+mod generate;
+
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -14,6 +16,13 @@ struct ProjectConfig {
     fixtures: Option<String>,
     suite: Option<String>,
     credentials: Option<CredentialConfig>,
+    hooks: Option<HooksConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HooksConfig {
+    pre_run: Option<String>,
+    post_run: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -324,6 +333,26 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
 
     println!("tctl run — project: {}, suite: {}, TCs: {}", config.project, suite, tc_files.len());
 
+    // pre_run hook
+    if let Some(ref hooks) = config.hooks {
+        if let Some(ref pre_run) = hooks.pre_run {
+            let script = resolve_relative(config_dir, pre_run);
+            println!("pre_run: {}", script.display());
+            let status = Command::new("sh").arg("-c").arg(script.to_string_lossy().as_ref()).status();
+            match status {
+                Ok(s) if s.success() => println!("pre_run: OK"),
+                Ok(s) => {
+                    eprintln!("pre_run FAILED (exit {}). Aborting.", s.code().unwrap_or(-1));
+                    process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("pre_run exec error: {}. Aborting.", e);
+                    process::exit(1);
+                }
+            }
+        }
+    }
+
     let devices: Vec<&DeviceConfig> = config.devices.iter().filter(|d| {
         if let Some(df) = device_filter {
             return d.name == df;
@@ -405,6 +434,20 @@ fn cmd_run(config: &ProjectConfig, config_dir: &Path, args: &[String]) {
             }
             Err(e) => {
                 println!("  exec error: {} ({:.1}s)", e, elapsed.as_secs_f64());
+            }
+        }
+    }
+
+    // post_run hook
+    if let Some(ref hooks) = config.hooks {
+        if let Some(ref post_run) = hooks.post_run {
+            let script = resolve_relative(config_dir, post_run);
+            println!("post_run: {}", script.display());
+            let status = Command::new("sh").arg("-c").arg(script.to_string_lossy().as_ref()).status();
+            match status {
+                Ok(s) if s.success() => println!("post_run: OK"),
+                Ok(s) => eprintln!("post_run FAILED (exit {}). Warning only.", s.code().unwrap_or(-1)),
+                Err(e) => eprintln!("post_run exec error: {}. Warning only.", e),
             }
         }
     }
@@ -546,14 +589,21 @@ fn cmd_validate(args: &[String]) {
                 failed += 1;
             }
 
-            // State has assert_target
+            // State has assert_target — predict generator fallback chain
             let assert_target = state.get("assert_target").and_then(|v| v.as_str()).unwrap_or("");
-            if !assert_target.is_empty() && assert_target.contains('_') && !assert_target.contains(' ') {
-                println!("  WARN   {}: assert_target looks like code identifier: '{}' (should be visible UI text)", full_id, assert_target);
+            if !assert_target.is_empty() && assert_target.contains('_') && !assert_target.contains(' ') && assert_target == assert_target.to_lowercase() {
+                let state_name = state.get("state").and_then(|v| v.as_str()).unwrap_or("??");
+                println!("  WARN   {}: assert_target '{}' is a code identifier — generator will fall back to state name '{}' (likely fails). Add visible UI text.", full_id, assert_target, state_name);
                 warnings += 1;
             }
             if assert_target.is_empty() {
-                println!("  WARN  {}: no assert_target (generator will infer from renders)", full_id);
+                let has_quoted = renders.contains('\'') || renders.contains('"');
+                if has_quoted {
+                    println!("  WARN  {}: no assert_target — generator will extract from renders quoted strings", full_id);
+                } else {
+                    let state_name = state.get("state").and_then(|v| v.as_str()).unwrap_or("??");
+                    println!("  WARN  {}: no assert_target and no quoted text in renders — generator will fall back to state name '{}' (likely fails). Add assert_target.", full_id, state_name);
+                }
                 warnings += 1;
             }
 
@@ -640,6 +690,55 @@ fn cmd_validate(args: &[String]) {
     }
 }
 
+// ── tctl generate ──
+
+fn cmd_generate(args: &[String]) {
+    let mut spec_path: Option<&str> = None;
+    let mut output_dir = "generated".to_string();
+    let mut baseline_dir: Option<String> = None;
+    let mut _platform: Option<String> = None;
+    let mut package: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--output-dir" if i + 1 < args.len() => { output_dir = args[i + 1].clone(); i += 2; }
+            "--baseline-dir" if i + 1 < args.len() => { baseline_dir = Some(args[i + 1].clone()); i += 2; }
+            "--platform" if i + 1 < args.len() => { _platform = Some(args[i + 1].clone()); i += 2; }
+            "--package" if i + 1 < args.len() => { package = Some(args[i + 1].clone()); i += 2; }
+            "--project" if i + 1 < args.len() => { i += 2; }
+            s if !s.starts_with('-') && spec_path.is_none() => { spec_path = Some(s); i += 1; }
+            _ => { i += 1; }
+        }
+    }
+
+    let spec_path = spec_path.unwrap_or_else(|| {
+        eprintln!("Usage: tctl generate <spec.yaml> [--output-dir <dir>] [--baseline-dir <dir>] [--platform <android|ios>]");
+        process::exit(1);
+    });
+
+    let content = fs::read_to_string(spec_path).unwrap_or_else(|e| {
+        eprintln!("Failed to read {}: {}", spec_path, e);
+        process::exit(2);
+    });
+    let spec: generate::SpecInput = serde_yaml::from_str(&content).unwrap_or_else(|e| {
+        eprintln!("Failed to parse {}: {}", spec_path, e);
+        process::exit(2);
+    });
+
+    let baseline_path = baseline_dir.map(|d| PathBuf::from(d));
+    let tcs = generate::generate_journeys(&spec, baseline_path.as_deref(), package.as_deref(), _platform.as_deref());
+
+    let out = Path::new(&output_dir);
+    match generate::write_tcs(&tcs, out) {
+        Ok(n) => println!("{} TCs generated to {}", n, output_dir),
+        Err(e) => {
+            eprintln!("Failed to write TCs: {}", e);
+            process::exit(2);
+        }
+    }
+}
+
 // ── main ──
 
 fn main() {
@@ -676,6 +775,11 @@ fn main() {
 
     if command == "validate" {
         cmd_validate(&args[remaining_args_start..]);
+        return;
+    }
+
+    if command == "generate" {
+        cmd_generate(&args[remaining_args_start..]);
         return;
     }
 
