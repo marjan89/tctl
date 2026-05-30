@@ -526,6 +526,14 @@ pub fn tc_to_yaml(tc: &GeneratedTC) -> String {
 }
 
 pub fn write_tcs(tcs: &[GeneratedTC], output_dir: &Path) -> io::Result<usize> {
+    if output_dir.is_dir() {
+        for entry in fs::read_dir(output_dir)?.flatten() {
+            let p = entry.path();
+            if p.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
+                fs::remove_file(&p)?;
+            }
+        }
+    }
     fs::create_dir_all(output_dir)?;
     for tc in tcs {
         let filename = format!("{}.yaml", tc.id.to_lowercase().replace('-', "_"));
