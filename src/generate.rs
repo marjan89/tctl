@@ -110,6 +110,8 @@ pub struct GeneratedStep {
     pub wait_timeout: Option<u64>,
     pub assert_type: Option<String>,
     pub source_comment: Option<String>,
+    pub direction: Option<String>,
+    pub times: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -118,7 +120,7 @@ pub struct GeneratedTC {
     pub name: String,
     pub precondition_activity: String,
     pub precondition_package: Option<String>,
-    pub precondition_logged_in: bool,
+    pub precondition_logged_in: Option<bool>,
     pub steps: Vec<GeneratedStep>,
 }
 
@@ -335,6 +337,9 @@ fn expand_journey_step(
         }
         JourneyStepDef::SearchSite { search_site } => {
             let name_ref = format!("{{{{fixtures.{}.name}}}}", search_site);
+            let name_ref_for_wait = name_ref.clone();
+            let card_ref = format!("{{{{fixtures.{}.card_name}}}}", search_site);
+            // Tap Search tab
             steps.push(GeneratedStep {
                 action: "tap".into(),
                 target_fuzzy: Some("Search".into()),
@@ -342,18 +347,48 @@ fn expand_journey_step(
                 ..step_defaults()
             });
             steps.push(GeneratedStep { action: "wait_idle".into(), seconds: Some(3), ..step_defaults() });
+            // Type site name
             steps.push(GeneratedStep {
                 action: "type".into(),
                 text: Some(name_ref.clone()),
                 ..step_defaults()
             });
             steps.push(GeneratedStep { action: "wait_idle".into(), seconds: Some(3), ..step_defaults() });
+            if platform == Some("android") {
+                // Android: results buried behind POIs — navigate via see all → list view
+                steps.push(GeneratedStep {
+                    action: "tap".into(),
+                    target_fuzzy: Some("see all".into()),
+                    ..step_defaults()
+                });
+                steps.push(GeneratedStep { action: "wait_idle".into(), seconds: Some(3), ..step_defaults() });
+                steps.push(GeneratedStep {
+                    action: "tap".into(),
+                    target_fuzzy: Some("list".into()),
+                    element_type: Some("Button".into()),
+                    ..step_defaults()
+                });
+                steps.push(GeneratedStep {
+                    action: "wait_until".into(),
+                    target_fuzzy: Some(card_ref.clone()),
+                    wait_timeout: Some(15),
+                    ..step_defaults()
+                });
+            }
+            // Tap the target site (Android uses card_name to disambiguate from filter chips)
+            let tap_ref = if platform == Some("android") { card_ref } else { name_ref };
             steps.push(GeneratedStep {
                 action: "tap".into(),
-                target_fuzzy: Some(name_ref),
+                target_fuzzy: Some(tap_ref),
                 ..step_defaults()
             });
-            steps.push(GeneratedStep { action: "wait_idle".into(), seconds: Some(5), ..step_defaults() });
+            // Wait until site detail page loads (poll for site name)
+            steps.push(GeneratedStep {
+                action: "wait_until".into(),
+                target_fuzzy: Some(name_ref_for_wait),
+                wait_timeout: Some(30),
+                ..step_defaults()
+            });
         }
         JourneyStepDef::Tap { tap, element_type } => {
             steps.push(GeneratedStep {
@@ -378,6 +413,7 @@ fn expand_journey_step(
                 target_fuzzy: Some(scroll_to.clone()),
                 ..step_defaults()
             });
+            steps.push(GeneratedStep { action: "wait_idle".into(), seconds: Some(3), ..step_defaults() });
         }
         JourneyStepDef::ScrollToAssert { scroll_to_assert } => {
             let checkpoint = resolve_checkpoint(&scroll_to_assert.fr, &scroll_to_assert.state, state_lookup, baseline_dir);
@@ -387,6 +423,7 @@ fn expand_journey_step(
                     target_fuzzy: Some(target.clone()),
                     ..step_defaults()
                 });
+                steps.push(GeneratedStep { action: "wait_idle".into(), seconds: Some(3), ..step_defaults() });
             }
             steps.push(checkpoint);
         }
@@ -461,7 +498,7 @@ pub fn generate_journeys(
             name: journey.name.clone(),
             precondition_activity: "MainActivity".into(),
             precondition_package: package.map(|s| s.to_string()),
-            precondition_logged_in: journey.auth.unwrap_or(false),
+            precondition_logged_in: journey.auth,
             steps,
         });
     }
@@ -479,8 +516,10 @@ pub fn tc_to_yaml(tc: &GeneratedTC) -> String {
         lines.push(format!("  package: {}", pkg));
     }
     lines.push(format!("  activity: {}", tc.precondition_activity));
-    if tc.precondition_logged_in {
-        lines.push("  logged_in: true".into());
+    match tc.precondition_logged_in {
+        Some(true) => lines.push("  logged_in: true".into()),
+        Some(false) => lines.push("  logged_in: false".into()),
+        None => {}
     }
     lines.push("steps:".into());
     for step in &tc.steps {
@@ -520,6 +559,12 @@ pub fn tc_to_yaml(tc: &GeneratedTC) -> String {
             if let Some(wt) = step.wait_timeout {
                 lines.push(format!("    wait_timeout: {}", wt));
             }
+            if let Some(ref d) = step.direction {
+                lines.push(format!("    direction: {}", d));
+            }
+            if let Some(t) = step.times {
+                lines.push(format!("    times: {}", t));
+            }
         }
     }
     lines.join("\n") + "\n"
@@ -556,6 +601,8 @@ fn step_defaults() -> GeneratedStep {
         wait_timeout: None,
         assert_type: None,
         source_comment: None,
+        direction: None,
+        times: None,
     }
 }
 
@@ -654,7 +701,7 @@ mod tests {
             name: "Browse Q&A".into(),
             precondition_activity: "MainActivity".into(),
             precondition_package: Some("se.naturkartan".into()),
-            precondition_logged_in: false,
+            precondition_logged_in: None,
             steps: vec![
                 GeneratedStep {
                     action: "tap".into(),
@@ -692,7 +739,7 @@ mod tests {
             name: "Post Question".into(),
             precondition_activity: "MainActivity".into(),
             precondition_package: None,
-            precondition_logged_in: true,
+            precondition_logged_in: Some(true),
             steps: vec![],
         };
         let yaml = tc_to_yaml(&tc);
@@ -712,20 +759,32 @@ mod tests {
     fn test_journey_auth_flag() {
         let spec = make_journey_spec();
         let tcs = generate_journeys(&spec, None, None, None);
-        assert!(!tcs[0].precondition_logged_in);
-        assert!(tcs[1].precondition_logged_in);
+        assert_eq!(tcs[0].precondition_logged_in, Some(false));
+        assert_eq!(tcs[1].precondition_logged_in, Some(true));
     }
 
     #[test]
     fn test_journey_search_site_expands() {
         let spec = make_journey_spec();
-        let tcs = generate_journeys(&spec, None, None, None);
+        // Android: see all → list → tap
+        let tcs = generate_journeys(&spec, None, None, Some("android"));
         let j1 = &tcs[0];
         assert_eq!(j1.steps[0].action, "tap");
         assert_eq!(j1.steps[0].target_fuzzy.as_deref(), Some("Search"));
         assert_eq!(j1.steps[0].element_type.as_deref(), Some("Button"));
         assert_eq!(j1.steps[2].action, "type");
         assert_eq!(j1.steps[2].text.as_deref(), Some("{{fixtures.test_site.name}}"));
+        assert_eq!(j1.steps[4].action, "tap");
+        assert_eq!(j1.steps[4].target_fuzzy.as_deref(), Some("see all"));
+        assert_eq!(j1.steps[6].action, "tap");
+        assert_eq!(j1.steps[6].target_fuzzy.as_deref(), Some("list"));
+        assert_eq!(j1.steps[8].action, "tap");
+        assert_eq!(j1.steps[8].target_fuzzy.as_deref(), Some("{{fixtures.test_site.card_name}}"));
+        // iOS: direct tap with name (no see all / list)
+        let tcs_ios = generate_journeys(&spec, None, None, Some("ios"));
+        let j1_ios = &tcs_ios[0];
+        assert_eq!(j1_ios.steps[4].action, "tap");
+        assert_eq!(j1_ios.steps[4].target_fuzzy.as_deref(), Some("{{fixtures.test_site.name}}"));
     }
 
     #[test]
